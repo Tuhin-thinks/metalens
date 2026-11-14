@@ -26,6 +26,10 @@ EXPLICITLY_EXCLUDED = {"D:/DCIM/13961019/DSC02365_edited.jpg"}
 
 TAGS = ["FocalLength", "DateTimeOriginal", "Orientation#"]  # '#' asks exiftool for the numeric EXIF value
 
+# Conventional focal length bands (mm). A value on an edge goes to the lower band.
+FOCAL_BAND_EDGES = [0, 35, 70, 105, 200]
+FOCAL_BAND_LABELS = ["Wide (≤35 mm)", "Standard (35–70 mm)", "Short tele (70–105 mm)", "Telephoto (105 mm+)"]
+
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 CACHE_MAX_AGE = timedelta(days=1)
 CACHE_PREFIX = "records_v4"  # bump when the stored record layout changes
@@ -165,6 +169,11 @@ def group_bursts(records: pd.DataFrame) -> pd.DataFrame:
         orientation=("orientation", "first"),
         frames=("file", "size"),
     ).reset_index(drop=True)
+
+
+def focal_band(focal_mm: pd.Series) -> pd.Series:
+    """Return the focal length band (FOCAL_BAND_LABELS) of each value, as an ordered category."""
+    return pd.cut(focal_mm, bins=FOCAL_BAND_EDGES, labels=FOCAL_BAND_LABELS)
 
 
 def in_focal_range(frames: pd.DataFrame, low: float, high: float) -> pd.DataFrame:
