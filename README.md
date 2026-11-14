@@ -14,6 +14,8 @@ Point it at a folder of Sony `.ARW` (or `.JPG`) photos. It reads the camera meta
 - **Find your shooting "modes" automatically.** DBSCAN groups focal lengths that cluster together (for example, a 18–35 mm wide-angle group and a 130–135 mm telephoto group), with photo counts and shares.
 - **Filter by focal length and aperture together.** Drag the focal length slider to 100–120 mm and the aperture slider to f/5.6–f/8, then page through the matching photos, eight at a time. Each thumbnail shows its file name, focal length and f-number.
 - **Look at the photos as they were shot.** Thumbnails are rotated upright from the camera's own orientation tag, including portrait shots.
+- **Open any photo full screen.** Use the expand icon in the corner of a thumbnail; press Esc to return.
+- **Copy a photo's file path.** Use the copy icon in the corner of a thumbnail to paste the path into another tool.
 - **Stay fast on big folders.** Metadata is cached for a day. Thumbnails come from each RAW's embedded JPEG preview (no RAW decoding), are cached on disk, and load in the background near the page you are viewing, within a 2 GiB memory cap.
 - **Choose your own eps.** Four notebooks walk through how the DBSCAN `eps` value was picked (k-distance elbow, density valleys, largest gap, HDBSCAN), and one shows the focal-length distribution after bursts are merged.
 - **Understand your aperture habits.** Two notebooks show the f-stops used, with and without burst merging, the wide/mid/stopped-down split, and how the f-number relates to focal length across the lens's range.
@@ -90,6 +92,7 @@ Not done yet:
 
 - No automated test suite is committed. The checks above were run as scratch scripts.
 - The memory plateau at the 2 GiB cap has not been measured while paging through the whole folder in a browser.
+- The thumbnail tile's buttons (copy, full screen, Esc) have not been clicked through in a browser. Automated checks cover only that the tiles render.
 - The three rotated-90° photos have not been checked by eye.
 
 ## Known limits
@@ -99,6 +102,7 @@ Not done yet:
 - **A burst's aperture is its first frame's.** Frames in one burst can have different f-numbers, and only the first is used.
 - **The lens limits in notebook 07 are references.** The f/3.5 and f/5.6 lines come from the lens name (18–135 mm F3.5–5.6), not from the photos. The per-photo `MaxApertureValue` tag would give the exact limit, and is not read yet.
 - **Cold thumbnails are slow.** Building one thumbnail takes about 0.36 s, mostly `exiftool` start-up. The disk cache makes later views fast.
+- **Copying needs a secure page.** The copy icon uses the browser clipboard, which works on `localhost` or HTTPS. Over plain HTTP from another machine it tries a text-selection copy, which some browsers block; a failure is shown under the photo.
 
 ## Project layout
 
