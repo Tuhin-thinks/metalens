@@ -1,4 +1,4 @@
-"""Streamlit app: focal-length statistics, DBSCAN groups and a focal-range photo browser.
+"""Streamlit app: focal-length and aperture statistics, DBSCAN groups and a photo browser.
 
 Run with:
     uv run streamlit run app.py -- <directory>
@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 from sklearn.cluster import DBSCAN
 
-from focal_data import group_bursts, load_records
+from focal_data import focal_band, group_bursts, load_records
 from viewer.ui import render_browser
 
 
@@ -43,6 +43,20 @@ def show_stats(focal: np.ndarray) -> None:
     col1.metric("Most used focal length", f"{counts.index[0]:g} mm")
     col2.metric("Share of photos", f"{counts.iloc[0] / counts.sum() * 100:.1f}%")
     st.bar_chart(counts.sort_index())
+
+
+def show_aperture(records: pd.DataFrame) -> None:
+    """Show the most used aperture, a bar chart per f-stop and a focal band by f-stop table."""
+    counts = records["aperture"].value_counts().sort_index()
+    col1, col2 = st.columns(2)
+    col1.metric("Most used aperture", f"f/{counts.idxmax():g}")
+    col2.metric("Share at that aperture", f"{counts.max() / counts.sum() * 100:.1f}%")
+    st.bar_chart(pd.Series(counts.to_numpy(), index=[f"f/{v:g}" for v in counts.index]))
+
+    table = pd.crosstab(focal_band(records["focal_mm"]), records["aperture"])
+    table.columns = [f"f/{v:g}" for v in table.columns]
+    st.subheader("Focal length band by aperture")
+    st.dataframe(table)
 
 
 def show_groups(focal: np.ndarray, eps: float, min_samples: int) -> None:
@@ -82,6 +96,7 @@ def main() -> None:
 
     focal = records["focal_mm"].to_numpy()
     show_stats(focal)
+    show_aperture(records)
     show_groups(focal, eps, min_samples)
     render_browser(records, group_bursts(records))
 
