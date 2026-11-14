@@ -6,6 +6,7 @@ Run with:
 
 import sys
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -46,7 +47,7 @@ def show_stats(focal: np.ndarray) -> None:
 
 
 def show_aperture(records: pd.DataFrame) -> None:
-    """Show the most used aperture, a bar chart per f-stop and a focal band by f-stop table."""
+    """Show the most used aperture, a bar chart per f-stop and a focal band by f-stop heatmap."""
     counts = records["aperture"].value_counts().sort_index()
     col1, col2 = st.columns(2)
     col1.metric("Most used aperture", f"f/{counts.idxmax():g}")
@@ -54,9 +55,18 @@ def show_aperture(records: pd.DataFrame) -> None:
     st.bar_chart(pd.Series(counts.to_numpy(), index=[f"f/{v:g}" for v in counts.index]))
 
     table = pd.crosstab(focal_band(records["focal_mm"]), records["aperture"])
-    table.columns = [f"f/{v:g}" for v in table.columns]
+    values = table.to_numpy()
     st.subheader("Focal length band by aperture")
-    st.dataframe(table)
+    fig, ax = plt.subplots(figsize=(10, 3))
+    image = ax.imshow(values, cmap="Blues", aspect="auto")
+    ax.set_xticks(range(values.shape[1]), [f"f/{v:g}" for v in table.columns], rotation=45)
+    ax.set_yticks(range(values.shape[0]), [str(band) for band in table.index])
+    for (i, j), count in np.ndenumerate(values):
+        if count:
+            ax.text(j, i, count, ha="center", va="center", fontsize=8)
+    fig.colorbar(image, ax=ax, label="photos")
+    st.pyplot(fig)
+    plt.close(fig)
 
 
 def show_groups(focal: np.ndarray, eps: float, min_samples: int) -> None:
