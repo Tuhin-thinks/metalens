@@ -9,6 +9,7 @@ import streamlit as st
 from focal_data import in_focal_range
 from viewer.buffer import ThumbnailBuffer
 from viewer.paging import PAGE_SIZE, page_count, paginate
+from viewer.thumbnails import Photo
 
 COLUMNS = 4
 
@@ -73,6 +74,7 @@ def _buffer_for(key: tuple, matches: pd.DataFrame) -> ThumbnailBuffer:
     if st.session_state.get("buffer_key") != key:
         if "buffer" in st.session_state:
             st.session_state.buffer.close()
-        st.session_state.buffer = ThumbnailBuffer([Path(f) for f in matches["file"]])
+        photos = [Photo(Path(f), o) for f, o in zip(matches["file"], matches["orientation"])]
+        st.session_state.buffer = ThumbnailBuffer(photos)
         st.session_state.buffer_key = key
     return st.session_state.buffer

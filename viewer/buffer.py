@@ -9,10 +9,9 @@ window around the viewing position. The visible page itself is never evicted.
 import threading
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
 
 from viewer.paging import PAGE_SIZE
-from viewer.thumbnails import make_thumbnail
+from viewer.thumbnails import Photo, make_thumbnail
 
 MEMORY_CAP_BYTES = 2 * 1024**3  # 2 GiB of thumbnail bytes on a 16 GB machine
 WORKERS = 4
@@ -22,16 +21,16 @@ class ThumbnailBuffer:
     """Hold thumbnails for an ordered list of photos, loading them in the background.
 
     Args:
-        order: Photo paths in display order. Positions are indices into this list.
+        order: Photos in display order. Positions are indices into this list.
         cap_bytes: Maximum total size of the buffered thumbnails.
-        loader: Builds one thumbnail from a photo path. Defaults to `make_thumbnail`.
+        loader: Builds one thumbnail from a photo. Defaults to `make_thumbnail`.
     """
 
     def __init__(
         self,
-        order: list[Path],
+        order: list[Photo],
         cap_bytes: int = MEMORY_CAP_BYTES,
-        loader: Callable[[Path], bytes] = make_thumbnail,
+        loader: Callable[[Photo], bytes] = make_thumbnail,
     ) -> None:
         self._order = order
         self._cap = cap_bytes
