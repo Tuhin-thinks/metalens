@@ -24,6 +24,10 @@ Point it at a folder of Sony `.ARW` (or `.JPG`) photos. It reads the camera meta
 
 ![Browse by focal range, portraits](images/04-browse-upright-portraits-page-14.png)
 
+![Filter by focal length and aperture together](images/06-browse-focal-and-aperture-filter.png)
+
+![Aperture statistics and focal band heatmap](images/05-aperture-statistics-heatmap.png)
+
 ![DBSCAN groups](images/02-dbscan-burst-groups.png)
 
 ## Quick start
