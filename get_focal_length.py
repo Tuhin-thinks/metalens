@@ -27,6 +27,20 @@ def find_files(directory: str, depth: int = 0) -> list[Path]:
     return files
 
 
+def _run_exiftool(args: list[str], stdin: str | None = None, text: bool = True) -> subprocess.CompletedProcess:
+    """Run exiftool.exe with the given arguments and return the completed process.
+
+    Args:
+        args: Arguments placed after the executable name.
+        stdin: Text sent to exiftool's standard input, or None.
+        text: True decodes stdout and stderr as text; False keeps raw bytes.
+
+    Returns:
+        The completed process. Its exit code is not checked here; callers decide.
+    """
+    return subprocess.run(["exiftool.exe", *args], input=stdin, capture_output=True, text=text)
+
+
 def get_exif(paths: list[Path], tags: list[str]) -> list[dict]:
     """Return exiftool metadata for files, one dict per file.
 
@@ -47,11 +61,9 @@ def get_exif(paths: list[Path], tags: list[str]) -> list[dict]:
     """
     if not paths:
         return []
-    result = subprocess.run(
-        ["exiftool.exe", *[f"-{tag}" for tag in tags], "-json", "-@", "-"],
-        input="\n".join(str(p) for p in paths),
-        capture_output=True,
-        text=True,
+    result = _run_exiftool(
+        [*[f"-{tag}" for tag in tags], "-json", "-@", "-"],
+        stdin="\n".join(str(p) for p in paths),
     )
     try:
         return json.loads(result.stdout)
@@ -59,17 +71,28 @@ def get_exif(paths: list[Path], tags: list[str]) -> list[dict]:
         raise ValueError(f"exiftool returned invalid JSON: {result.stderr.strip()}") from err
 
 
-def get_focal_lengths(paths: list[Path]) -> list[dict]:
-    """Return exiftool metadata entries (SourceFile, FocalLength) for files.
+def get_preview_bytes(path: Path) -> bytes:
+    """Return the JPEG preview embedded in a RAW file, without decoding the RAW.
+
+    Sony ARW files carry a full-size JPEG. Reading it is far cheaper than
+    decoding the sensor data. `PreviewImage` is tried first, then `JpgFromRaw`.
 
     Args:
-        paths: Files to inspect.
+        path: Image file to read the preview from.
 
     Returns:
-        One dict per file. Files without focal length metadata lack the
-        "FocalLength" key.
+        The raw JPEG bytes.
+
+    Raises:
+        ValueError: If exiftool fails or the file has no embedded preview.
     """
-    return get_exif(paths, ["FocalLength"])
+    for tag in ("PreviewImage", "JpgFromRaw"):
+        result = _run_exiftool(["-b", f"-{tag}", str(path)], text=False)
+        if result.returncode != 0:
+            raise ValueError(f"exiftool failed on {path}: {result.stderr.decode(errors='replace').strip()}")
+        if result.stdout:
+            return result.stdout
+    raise ValueError(f"No embedded preview in {path}")
 
 
 def main() -> None:
@@ -81,7 +104,7 @@ def main() -> None:
     parser.add_argument("-d", "--depth", type=int, default=0, help="Levels of subfolders to scan (default: 0)")
     args = parser.parse_args()
 
-    for entry in get_focal_lengths(find_files(args.directory, args.depth)):
+    for entry in get_exif(find_files(args.directory, args.depth), ["FocalLength"]):
         print(entry["SourceFile"], entry.get("FocalLength"))
 
 
