@@ -24,11 +24,11 @@ IMAGE_SUFFIXES = {".arw", ".jpg", ".jpeg"}
 # Images excluded on purpose: an edited export with no camera metadata.
 EXPLICITLY_EXCLUDED = {"D:/DCIM/13961019/DSC02365_edited.jpg"}
 
-TAGS = ["FocalLength", "DateTimeOriginal"]
+TAGS = ["FocalLength", "DateTimeOriginal", "Orientation#"]  # '#' asks exiftool for the numeric EXIF value
 
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 CACHE_MAX_AGE = timedelta(days=1)
-CACHE_PREFIX = "records_v3"  # bump when the stored record layout changes
+CACHE_PREFIX = "records_v4"  # bump when the stored record layout changes
 # A cache built with different tags or exclusions is rebuilt, not reused.
 SETTINGS = {"tags": TAGS, "excluded": sorted(EXPLICITLY_EXCLUDED)}
 
@@ -61,13 +61,14 @@ def _scan(directory: str, depth: int) -> list[dict]:
         source = entry["SourceFile"]
         if source in EXPLICITLY_EXCLUDED:
             continue
-        for key in TAGS:
-            if key not in entry:
-                raise ValueError(f"Image has no {key}: {source}")
+        for tag in TAGS:
+            if tag.removesuffix("#") not in entry:
+                raise ValueError(f"Image has no {tag}: {source}")
         records.append({
             "file": source,
             "focal_mm": float(entry["FocalLength"].removesuffix(" mm")),
             "datetime": entry["DateTimeOriginal"],
+            "orientation": entry["Orientation"],  # EXIF value 1-8, see viewer.thumbnails
         })
     return records
 
@@ -90,7 +91,7 @@ def load_records(directory: str, depth: int) -> pd.DataFrame:
         depth: Levels of subfolders to scan (0 = only the folder itself).
 
     Returns:
-        DataFrame with columns file, focal_mm and datetime.
+        DataFrame with columns file, focal_mm, datetime and orientation (EXIF 1-8).
 
     Raises:
         ValueError: From `_scan`, or if a cache file exists but is malformed.
@@ -150,8 +151,8 @@ def group_bursts(records: pd.DataFrame) -> pd.DataFrame:
         records: Output of `load_records`.
 
     Returns:
-        DataFrame with one row per burst: file, focal_mm and datetime of its
-        first frame, and frames (number of frames in the burst).
+        DataFrame with one row per burst: file, focal_mm, datetime and
+        orientation of its first frame, and frames (number of frames in the burst).
     """
     frames = records.sort_values("file", kind="stable").reset_index(drop=True)
     folder = frames["file"].str.rsplit("/", n=1).str[0]
@@ -161,6 +162,7 @@ def group_bursts(records: pd.DataFrame) -> pd.DataFrame:
         file=("file", "first"),
         focal_mm=("focal_mm", "first"),
         datetime=("datetime", "first"),
+        orientation=("orientation", "first"),
         frames=("file", "size"),
     ).reset_index(drop=True)
 
