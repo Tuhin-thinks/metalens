@@ -6,30 +6,6 @@ Point it at a folder of Sony `.ARW` (or `.JPG`) photos. It reads the camera meta
 
 ![Focal length overview](images/01-focal-length-overview.png)
 
-## What you can do with it
-
-- **See your real lens habits.** A histogram of focal lengths, the most-used focal length, and its share of your photos.
-- **See which apertures you use.** The most-used f-stop, a bar chart per f-stop, and a table of focal length band by f-stop.
-- **Count bursts as one shot.** Frames taken in the same second are collapsed into one, so a 10-frame burst does not skew the numbers.
-- **Find your shooting "modes" automatically.** DBSCAN groups focal lengths that cluster together (for example, a 18–35 mm wide-angle group and a 130–135 mm telephoto group), with photo counts and shares.
-- **Filter by focal length and aperture together.** Drag the focal length slider to 100–120 mm and the aperture slider to f/5.6–f/8, then page through the matching photos, eight at a time. Each thumbnail shows its file name, focal length and f-number.
-- **Look at the photos as they were shot.** Thumbnails are rotated upright from the camera's own orientation tag, including portrait shots.
-- **Open any photo full screen.** Use the expand icon in the corner of a thumbnail; press Esc to return.
-- **Copy a photo's file path.** Use the copy icon in the corner of a thumbnail to paste the path into another tool.
-- **Stay fast on big folders.** Metadata is cached for a day. Thumbnails come from each RAW's embedded JPEG preview (no RAW decoding), are cached on disk, and load in the background near the page you are viewing, within a 2 GiB memory cap.
-- **Choose your own eps.** Four notebooks walk through how the DBSCAN `eps` value was picked (k-distance elbow, density valleys, largest gap, HDBSCAN), and one shows the focal-length distribution after bursts are merged.
-- **Understand your aperture habits.** Two notebooks show the f-stops used, with and without burst merging, the wide/mid/stopped-down split, and how the f-number relates to focal length across the lens's range.
-
-![Browse by focal range, landscapes](images/03-browse-landscapes-page-7.png)
-
-![Browse by focal range, portraits](images/04-browse-upright-portraits-page-14.png)
-
-![Filter by focal length and aperture together](images/06-browse-focal-and-aperture-filter.png)
-
-![Aperture statistics and focal band heatmap](images/05-aperture-statistics-heatmap.png)
-
-![DBSCAN groups](images/02-dbscan-burst-groups.png)
-
 ## Quick start
 
 Requirements: Windows (or any OS with `exiftool` on the PATH), [uv](https://docs.astral.sh/uv/), Python 3.13 (uv installs it).
@@ -41,23 +17,48 @@ uv run streamlit run app.py -- D:\DCIM
 
 Then open the URL Streamlit prints. The folder argument is the default directory shown in the app. Change the directory and subfolder depth in the app to scan other folders.
 
-### Command line
-
-Print the focal length of every image in a folder:
+Print the focal length of every image in a folder from the command line:
 
 ```powershell
 uv run python get_focal_length.py D:\DCIM --depth 1
 ```
 
+## What you can do with it
+
+**Lens habits and apertures**
+
+- **See your real lens habits.** A histogram of focal lengths, the most-used focal length, and its share of your photos.
+- **See which apertures you use.** The most-used f-stop, a bar chart per f-stop, and a heatmap of focal length band by f-stop.
+- **Count bursts as one shot.** Frames taken in the same second are collapsed into one, so a 10-frame burst does not skew the numbers.
+- **Find your shooting "modes" automatically.** DBSCAN groups focal lengths that cluster together (for example, a 18–35 mm wide-angle group and a 130–135 mm telephoto group), with photo counts and shares.
+
+**Browsing**
+
+- **Filter by focal length and aperture together.** Drag the focal length slider to 100–120 mm and the aperture slider to f/5.6–f/8, then page through the matching photos, eight at a time. Each thumbnail shows its file name, focal length and f-number.
+- **Look at the photos as they were shot.** Thumbnails are rotated upright from the camera's own orientation tag, including portrait shots.
+- **Open any photo full screen.** Use the expand icon in the corner of a thumbnail; press Esc to return.
+- **Copy a photo's file path.** Use the copy icon in the corner of a thumbnail to paste the path into another tool.
+- **Stay fast on big folders.** Metadata is cached for a day. Thumbnails come from each RAW's embedded JPEG preview (no RAW decoding), are cached on disk, and load in the background near the page you are viewing, within a 2 GiB memory cap.
+
+![Aperture statistics and focal band heatmap](images/05-aperture-statistics-heatmap.png)
+
+![DBSCAN groups](images/02-dbscan-burst-groups.png)
+
+![Filter by focal length and aperture together](images/06-browse-focal-and-aperture-filter.png)
+
+![Browse by focal range, landscapes](images/03-browse-landscapes-page-7.png)
+
+![Browse by focal range, portraits](images/04-browse-upright-portraits-page-14.png)
+
 ## How it works
 
 | Piece | Role |
 |---|---|
-| `get_focal_length.py` | Runs `exiftool` in one batch per folder: focal length, timestamps, orientation, and the embedded preview JPEG. |
+| `get_focal_length.py` | Runs `exiftool` in one batch per folder: focal length, timestamps, orientation, f-number and the embedded preview JPEG. |
 | `focal_data.py` | Loads one row per image, caches it in `.cache/` for a day, groups bursts, shares the focal bands, and filters by focal length and aperture range. |
 | `app.py` | Streamlit dashboard: focal length and aperture statistics, DBSCAN groups, and the browser. |
 | `viewer/` | Browser backend: paging, thumbnail generation and disk cache, memory-capped background buffer, and the Streamlit section. |
-| `notebooks/` | Notebooks 01–07: choosing `eps` (01–04), the focal-length distribution (05), and aperture (06–07). |
+| `notebooks/` | Notebooks 01–07 for the data analysis below. |
 
 Key choices:
 
@@ -84,13 +85,11 @@ Checks that were run:
 - The record cache: a fresh scan, a cache hit, and a rebuild when the settings change.
 - Aperture: 885 records with an f-number on every one, 16 distinct f-stops, 877 bursts.
 - Burst grouping and the focal length and aperture filter (both ranges inclusive).
-- Streamlit's browser with `AppTest` on the real folder, combined filter: 100–120 mm with f/5.6–f/8 gives 36 photos, equal to an independent pandas mask. Every caption on the page is inside both ranges.
+- The app under Streamlit's `AppTest` on the real folder: default view, a 100–120 mm range (51 bursts), paging with Next, and the combined filter 100–120 mm with f/5.6–f/8, which gives 36 photos, equal to an independent pandas mask. Every caption on the page is inside both ranges.
 - The app's aperture statistics against pandas: most-used f/5.6 at 19.8% of photos.
-- Notebooks 06 and 07 executed end to end with exit code 0. Notebook 05's outputs were unchanged after its focal bands moved into `focal_data.py`.
-- All notebooks 01–04 executed end to end with exit code 0.
-- The Streamlit app headlessly with Streamlit's `AppTest` on the real folder: default view, a 100–120 mm range (51 bursts), and paging with Next.
 - Thumbnails of two rotated RAW files checked against their orientation tags: upright portrait output at 450×800.
 - The thumbnail buffer with a fake loader and a small cap: the cap is never exceeded, the nearest photos load first, the farthest are evicted first, the visible page is never evicted, and a background error is re-raised.
+- Notebooks 01–07 executed end to end with exit code 0.
 
 Not done yet:
 
@@ -115,8 +114,28 @@ app.py                 Streamlit dashboard
 get_focal_length.py    exiftool wrapper and CLI
 focal_data.py          records, cache, burst grouping, focal and aperture filter
 viewer/                photo browser (paging, thumbnails, buffer, UI)
-notebooks/             01–07 exploration notebooks
+notebooks/             01–07 analysis notebooks
 images/                screenshots for this README
 ```
 
 Caches are written to `.cache/` and `viewer/.cache/` and are ignored by git.
+
+## Data analysis
+
+The notebooks in [`notebooks/`](notebooks/) hold the analysis behind the app's defaults. Each one reads the same folder through `focal_data.py`, and each has a takeaways section with figures from the run (885 images, 877 bursts). They describe that folder only.
+
+**Choosing the DBSCAN `eps`** (notebooks 01–04):
+
+- [01 k-distance elbow](notebooks/01_k_distance_elbow.ipynb): the elbow suggests `eps` 2.00 mm (`min_samples` 20).
+- [02 density valleys](notebooks/02_density_valleys.ipynb): the lowest density valley is at 107.7 mm. The KDE bandwidth of 11.16 mm is a smoothing scale, not an `eps` candidate.
+- [03 largest gap](notebooks/03_largest_gap.ipynb): the largest gaps fall at 104.0 mm and 120.0 mm, and the Tukey fence suggests `eps` 3.00 mm.
+- [04 HDBSCAN](notebooks/04_hdbscan.ipynb): suggests `eps` 3.00 mm, finds 11 clusters and 87 noise photos. Examples: 121–135 mm (165 photos), 18 mm (164), 59–80 mm (95).
+
+**Focal length distribution** (notebook 05):
+
+- [05 distribution](notebooks/05_distribution.ipynb): across 877 bursts the median is 49 mm and the middle half spans 24–99 mm. Shares by band: wide (≤35 mm) 38.7%, standard (35–70 mm) 24.7%, short tele (70–105 mm) 13.7%, telephoto (105 mm+) 22.9%. The 18 mm (18.4%) and 135 mm (17.9%) peaks are the most common single focal lengths. Merging bursts shifts any band share by at most 0.2 percentage points.
+
+**Aperture** (notebooks 06–07):
+
+- [06 aperture distribution](notebooks/06_aperture_distribution.ipynb): 16 f-stops in use. f/5.6 is the most used at 20.0% of bursts. Mid (f/5–f/8) is 50.4%, stopped down (f/9 and narrower) 41.7%, and wide (f/4.5 and wider) 7.9%.
+- [07 aperture vs focal length](notebooks/07_aperture_vs_focal.ipynb): wide openings appear only at short focal lengths. 18.9% of bursts in the wide band were at f/4.5 or wider, against 2.3% in the standard band and none at 70 mm or longer. The median f-number is f/8 in every band.
