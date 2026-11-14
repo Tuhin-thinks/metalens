@@ -163,3 +163,17 @@ def group_bursts(records: pd.DataFrame) -> pd.DataFrame:
         datetime=("datetime", "first"),
         frames=("file", "size"),
     ).reset_index(drop=True)
+
+
+def in_focal_range(frames: pd.DataFrame, low: float, high: float) -> pd.DataFrame:
+    """Return the rows whose focal length lies in [low, high], sorted by file.
+
+    Args:
+        frames: DataFrame with a focal_mm column (records or burst rows).
+        low: Lower bound in mm, inclusive.
+        high: Upper bound in mm, inclusive.
+
+    Returns:
+        Matching rows with a fresh 0-based index.
+    """
+    return frames[frames["focal_mm"].between(low, high)].sort_values("file").reset_index(drop=True)
