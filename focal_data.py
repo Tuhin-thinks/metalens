@@ -1,8 +1,7 @@
 """Load image records (focal length, timestamp) and group bursts for the notebooks.
 
-Fails fast: every image must carry the mandatory tags below. The only
-exceptions are the files listed in EXPLICITLY_EXCLUDED, named here so they stay
-visible.
+An image that lacks a mandatory tag is skipped with a warning naming the file and
+the missing tag, so the rest of the folder still loads. Invalid values still fail fast.
 
 Records are cached per (directory, depth) in the project's .cache/ folder. A
 cache entry is reused until it is more than one day old, and it is checked only
@@ -11,6 +10,7 @@ when a loader is called, i.e. when a script or notebook starts.
 
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -19,12 +19,11 @@ import pandas as pd
 
 from get_focal_length import find_files, get_exif
 
+log = logging.getLogger(__name__)
+
 IMAGE_SUFFIXES = {".arw", ".jpg", ".jpeg"}
 
-# Images excluded on purpose: an edited export with no camera metadata.
-EXPLICITLY_EXCLUDED = {"D:/DCIM/13961019/DSC02365_edited.jpg"}
-
-TAGS = ["FocalLength", "DateTimeOriginal", "Orientation#"]  # '#' asks exiftool for the numeric EXIF value
+TAGS = ["FocalLength", "DateTimeOriginal", "Orientation#", "FNumber"]  # '#' asks exiftool for the numeric EXIF value
 
 # Conventional focal length bands (mm). A value on an edge goes to the lower band.
 FOCAL_BAND_EDGES = [0, 35, 70, 105, 200]
@@ -32,9 +31,9 @@ FOCAL_BAND_LABELS = ["Wide (≤35 mm)", "Standard (35–70 mm)", "Short tele (70
 
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 CACHE_MAX_AGE = timedelta(days=1)
-CACHE_PREFIX = "records_v4"  # bump when the stored record layout changes
-# A cache built with different tags or exclusions is rebuilt, not reused.
-SETTINGS = {"tags": TAGS, "excluded": sorted(EXPLICITLY_EXCLUDED)}
+CACHE_PREFIX = "records_v5"  # bump when the stored record layout changes
+# A cache built with different tags is rebuilt, not reused.
+SETTINGS = {"tags": TAGS}
 
 
 def _scan(directory: str, depth: int) -> list[dict]:
@@ -45,12 +44,12 @@ def _scan(directory: str, depth: int) -> list[dict]:
         depth: Levels of subfolders to scan (0 = only the folder itself).
 
     Returns:
-        One record per image: file, focal_mm and datetime (DateTimeOriginal).
+        One record per image that has every mandatory tag: file, focal_mm,
+        datetime (DateTimeOriginal), orientation (EXIF 1-8) and aperture (f-number).
 
     Raises:
         ValueError: If no images are found, exiftool returns a different number
-            of entries than files sent, an image lacks a mandatory tag, or a
-            value is in an unexpected format.
+            of entries than files sent, or a value is in an unexpected format.
     """
     images = [f for f in find_files(directory, depth) if f.suffix.lower() in IMAGE_SUFFIXES]
     if not images:
@@ -63,16 +62,16 @@ def _scan(directory: str, depth: int) -> list[dict]:
     records = []
     for entry in entries:
         source = entry["SourceFile"]
-        if source in EXPLICITLY_EXCLUDED:
+        missing = [tag for tag in TAGS if tag.removesuffix("#") not in entry]
+        if missing:
+            log.warning("Skipping %s: no %s in its metadata", source, ", ".join(missing))
             continue
-        for tag in TAGS:
-            if tag.removesuffix("#") not in entry:
-                raise ValueError(f"Image has no {tag}: {source}")
         records.append({
             "file": source,
             "focal_mm": float(entry["FocalLength"].removesuffix(" mm")),
             "datetime": entry["DateTimeOriginal"],
             "orientation": entry["Orientation"],  # EXIF value 1-8, see viewer.thumbnails
+            "aperture": float(entry["FNumber"]),
         })
     return records
 
@@ -95,7 +94,8 @@ def load_records(directory: str, depth: int) -> pd.DataFrame:
         depth: Levels of subfolders to scan (0 = only the folder itself).
 
     Returns:
-        DataFrame with columns file, focal_mm, datetime and orientation (EXIF 1-8).
+        DataFrame with columns file, focal_mm, datetime, orientation (EXIF 1-8)
+        and aperture (f-number).
 
     Raises:
         ValueError: From `_scan`, or if a cache file exists but is malformed.
@@ -155,8 +155,8 @@ def group_bursts(records: pd.DataFrame) -> pd.DataFrame:
         records: Output of `load_records`.
 
     Returns:
-        DataFrame with one row per burst: file, focal_mm, datetime and
-        orientation of its first frame, and frames (number of frames in the burst).
+        DataFrame with one row per burst: file, focal_mm, datetime, orientation and
+        aperture of its first frame, and frames (number of frames in the burst).
     """
     frames = records.sort_values("file", kind="stable").reset_index(drop=True)
     folder = frames["file"].str.rsplit("/", n=1).str[0]
@@ -167,6 +167,7 @@ def group_bursts(records: pd.DataFrame) -> pd.DataFrame:
         focal_mm=("focal_mm", "first"),
         datetime=("datetime", "first"),
         orientation=("orientation", "first"),
+        aperture=("aperture", "first"),
         frames=("file", "size"),
     ).reset_index(drop=True)
 

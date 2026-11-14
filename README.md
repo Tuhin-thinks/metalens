@@ -68,7 +68,7 @@ Hardware and software:
 Data:
 
 - A real photo collection of about 885 Sony `.ARW` and `.JPG` files in nested folders, scanned at subfolder depth 1 (877 bursts after grouping).
-- Orientation tags over the collection: 547 normal, 335 rotated 270° CW, 3 rotated 90° CW, and 1 image without a tag (the edited JPEG, excluded on purpose).
+- Orientation tags over the collection: 547 normal, 335 rotated 270° CW, 3 rotated 90° CW, and 1 image without camera metadata (an edited JPEG, skipped with a warning).
 
 Checks that were run:
 
