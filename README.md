@@ -1,20 +1,22 @@
 # Get Raw Image Information
 
-**Find out which focal lengths you really shoot with, and browse your photos by focal range, without loading a single RAW file.**
+**Find out which focal lengths and apertures you really shoot with, and browse your photos by both, without loading a single RAW file.**
 
-Point it at a folder of Sony `.ARW` (or `.JPG`) photos. It reads the camera metadata with `exiftool`, shows you your most-used focal lengths, groups them into clusters, and lets you slide through a focal range to view the matching photos.
+Point it at a folder of Sony `.ARW` (or `.JPG`) photos. It reads the camera metadata with `exiftool`, shows your most-used focal lengths and apertures, groups focal lengths into clusters, and lets you filter by focal length and aperture together to view the matching photos.
 
 ![Focal length overview](images/01-focal-length-overview.png)
 
 ## What you can do with it
 
 - **See your real lens habits.** A histogram of focal lengths, the most-used focal length, and its share of your photos.
+- **See which apertures you use.** The most-used f-stop, a bar chart per f-stop, and a table of focal length band by f-stop.
 - **Count bursts as one shot.** Frames taken in the same second are collapsed into one, so a 10-frame burst does not skew the numbers.
 - **Find your shooting "modes" automatically.** DBSCAN groups focal lengths that cluster together (for example, a 18–35 mm wide-angle group and a 130–135 mm telephoto group), with photo counts and shares.
-- **Browse photos by focal range.** Drag a slider to pick, say, 100–120 mm and page through the matching photos, eight at a time, with the file name and focal length under each thumbnail.
+- **Filter by focal length and aperture together.** Drag the focal length slider to 100–120 mm and the aperture slider to f/5.6–f/8, then page through the matching photos, eight at a time. Each thumbnail shows its file name, focal length and f-number.
 - **Look at the photos as they were shot.** Thumbnails are rotated upright from the camera's own orientation tag, including portrait shots.
 - **Stay fast on big folders.** Metadata is cached for a day. Thumbnails come from each RAW's embedded JPEG preview (no RAW decoding), are cached on disk, and load in the background near the page you are viewing, within a 2 GiB memory cap.
-- **Choose your own eps.** Five notebooks walk through how the DBSCAN `eps` value was picked (k-distance elbow, density valleys, largest gap, HDBSCAN) and show the focal-length distribution after bursts are merged.
+- **Choose your own eps.** Four notebooks walk through how the DBSCAN `eps` value was picked (k-distance elbow, density valleys, largest gap, HDBSCAN), and one shows the focal-length distribution after bursts are merged.
+- **Understand your aperture habits.** Two notebooks show the f-stops used, with and without burst merging, the wide/mid/stopped-down split, and how the f-number relates to focal length across the lens's range.
 
 ![Browse by focal range, landscapes](images/03-browse-landscapes-page-7.png)
 
@@ -46,16 +48,16 @@ uv run python get_focal_length.py D:\DCIM --depth 1
 | Piece | Role |
 |---|---|
 | `get_focal_length.py` | Runs `exiftool` in one batch per folder: focal length, timestamps, orientation, and the embedded preview JPEG. |
-| `focal_data.py` | Loads one row per image, caches it in `.cache/` for a day, groups bursts, and filters by focal range. |
-| `app.py` | Streamlit dashboard: statistics, DBSCAN groups, and the browser. |
+| `focal_data.py` | Loads one row per image, caches it in `.cache/` for a day, groups bursts, shares the focal bands, and filters by focal length and aperture range. |
+| `app.py` | Streamlit dashboard: focal length and aperture statistics, DBSCAN groups, and the browser. |
 | `viewer/` | Browser backend: paging, thumbnail generation and disk cache, memory-capped background buffer, and the Streamlit section. |
-| `notebooks/` | Exploration notebooks 01–05 for choosing `eps` and describing the distribution. |
+| `notebooks/` | Notebooks 01–07: choosing `eps` (01–04), the focal-length distribution (05), and aperture (06–07). |
 
 Key choices:
 
 - **Preview, not RAW.** A Sony `.ARW` file embeds a 1920×1080 JPEG. Reading that takes milliseconds, while decoding the RAW takes seconds.
 - **Orientation from the RAW tags.** The embedded preview has no EXIF block, so the orientation is read from the RAW and applied to the thumbnail.
-- **Fail fast.** A missing mandatory tag, a bad orientation value, or an unreadable preview raises an error. Nothing is silently skipped, except the one edited JPEG listed in `focal_data.py`.
+- **Fail fast, with one exception.** A bad value (orientation, focal length, f-number) or an unreadable preview raises an error. An image without a mandatory tag is skipped with a logged warning that names the file and the missing tag, so one edited JPEG does not stop a folder from loading.
 
 ## Tested with
 
@@ -74,8 +76,12 @@ Checks that were run:
 
 - The CLI on the real folder.
 - The record cache: a fresh scan, a cache hit, and a rebuild when the settings change.
-- Burst grouping and the focal range filter.
-- All five notebooks executed end to end with exit code 0.
+- Aperture: 885 records with an f-number on every one, 16 distinct f-stops, 877 bursts.
+- Burst grouping and the focal length and aperture filter (both ranges inclusive).
+- Streamlit's browser with `AppTest` on the real folder, combined filter: 100–120 mm with f/5.6–f/8 gives 36 photos, equal to an independent pandas mask. Every caption on the page is inside both ranges.
+- The app's aperture statistics against pandas: most-used f/5.6 at 19.8% of photos.
+- Notebooks 06 and 07 executed end to end with exit code 0. Notebook 05's outputs were unchanged after its focal bands moved into `focal_data.py`.
+- All notebooks 01–04 executed end to end with exit code 0.
 - The Streamlit app headlessly with Streamlit's `AppTest` on the real folder: default view, a 100–120 mm range (51 bursts), and paging with Next.
 - Thumbnails of two rotated RAW files checked against their orientation tags: upright portrait output at 450×800.
 - The thumbnail buffer with a fake loader and a small cap: the cap is never exceeded, the nearest photos load first, the farthest are evicted first, the visible page is never evicted, and a background error is re-raised.
@@ -90,6 +96,8 @@ Not done yet:
 
 - **DBSCAN at `eps` 3 mm chains nearby focal lengths.** On the test collection, the default settings merge 18–83 mm into one large group. Use the notebooks to pick a different `eps` or switch to HDBSCAN.
 - **Bursts are grouped by identical timestamps.** A burst that crosses a second boundary is split. Two single shots in the same second are merged.
+- **A burst's aperture is its first frame's.** Frames in one burst can have different f-numbers, and only the first is used.
+- **The lens limits in notebook 07 are references.** The f/3.5 and f/5.6 lines come from the lens name (18–135 mm F3.5–5.6), not from the photos. The per-photo `MaxApertureValue` tag would give the exact limit, and is not read yet.
 - **Cold thumbnails are slow.** Building one thumbnail takes about 0.36 s, mostly `exiftool` start-up. The disk cache makes later views fast.
 
 ## Project layout
@@ -97,9 +105,9 @@ Not done yet:
 ```
 app.py                 Streamlit dashboard
 get_focal_length.py    exiftool wrapper and CLI
-focal_data.py          records, cache, burst grouping, focal-range filter
+focal_data.py          records, cache, burst grouping, focal and aperture filter
 viewer/                photo browser (paging, thumbnails, buffer, UI)
-notebooks/             01–05 exploration notebooks
+notebooks/             01–07 exploration notebooks
 images/                screenshots for this README
 ```
 
