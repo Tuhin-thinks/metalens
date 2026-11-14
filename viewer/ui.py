@@ -8,7 +8,7 @@ import streamlit as st
 
 from focal_data import filter_frames
 from viewer.buffer import ThumbnailBuffer
-from viewer.copy_image import copyable_image
+from viewer.photo_tile import photo_tile
 from viewer.paging import PAGE_SIZE, page_count, paginate
 from viewer.thumbnails import Photo
 
@@ -59,7 +59,7 @@ def render_browser(records: pd.DataFrame, bursts: pd.DataFrame) -> None:
     try:
         for offset, row in enumerate(paginate(matches, page).itertuples()):
             with cols[offset % COLUMNS]:
-                copyable_image(
+                photo_tile(
                     buffer.get(page * PAGE_SIZE + offset),
                     Path(row.file),
                     caption=f"{Path(row.file).name} · {row.focal_mm:g} mm · f/{row.aperture:g}",
