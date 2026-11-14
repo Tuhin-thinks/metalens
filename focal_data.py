@@ -177,15 +177,18 @@ def focal_band(focal_mm: pd.Series) -> pd.Series:
     return pd.cut(focal_mm, bins=FOCAL_BAND_EDGES, labels=FOCAL_BAND_LABELS)
 
 
-def in_focal_range(frames: pd.DataFrame, low: float, high: float) -> pd.DataFrame:
-    """Return the rows whose focal length lies in [low, high], sorted by file.
+def filter_frames(frames: pd.DataFrame, focal: tuple[float, float], aperture: tuple[float, float]) -> pd.DataFrame:
+    """Return the rows inside both ranges, sorted by file.
 
     Args:
-        frames: DataFrame with a focal_mm column (records or burst rows).
-        low: Lower bound in mm, inclusive.
-        high: Upper bound in mm, inclusive.
+        frames: DataFrame with focal_mm and aperture columns (records or burst rows).
+        focal: (low, high) focal length in mm, both inclusive.
+        aperture: (low, high) f-number, both inclusive.
 
     Returns:
         Matching rows with a fresh 0-based index.
     """
-    return frames[frames["focal_mm"].between(low, high)].sort_values("file").reset_index(drop=True)
+    low, high = focal
+    f_low, f_high = aperture
+    inside = frames["focal_mm"].between(low, high) & frames["aperture"].between(f_low, f_high)
+    return frames[inside].sort_values("file").reset_index(drop=True)
