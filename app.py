@@ -1,4 +1,4 @@
-"""Streamlit app: focal-length statistics and DBSCAN groups for a photo folder.
+"""Streamlit app: focal-length statistics, DBSCAN groups and a focal-range photo browser.
 
 Run with:
     uv run streamlit run app.py -- <directory>
@@ -11,7 +11,8 @@ import pandas as pd
 import streamlit as st
 from sklearn.cluster import DBSCAN
 
-from focal_data import load_focal_mm
+from focal_data import group_bursts, load_records
+from viewer.ui import render_browser
 
 
 def group_focal(focal: np.ndarray, eps: float, min_samples: int) -> tuple[pd.DataFrame, np.ndarray]:
@@ -35,30 +36,17 @@ def group_focal(focal: np.ndarray, eps: float, min_samples: int) -> tuple[pd.Dat
     return summary.sort_values("Min mm"), labels
 
 
-default_dir = sys.argv[1] if len(sys.argv) > 1 else ""
-st.title("Focal Length Analysis")
-
-path_col, depth_col = st.columns([3, 1])
-directory = path_col.text_input("Image directory", value=default_dir)
-depth = int(depth_col.number_input("Subfolder depth", min_value=0, max_value=20, value=0, step=1))
-
-eps_col, min_col = st.columns(2)
-eps = eps_col.number_input("DBSCAN eps (mm)", min_value=0.1, value=3.0, step=0.5)
-min_samples = int(min_col.number_input("DBSCAN min_samples", min_value=1, value=20, step=1))
-
-if directory:
-    try:
-        focal = load_focal_mm(directory, depth)
-    except ValueError as err:
-        st.error(str(err))
-        st.stop()
-
+def show_stats(focal: np.ndarray) -> None:
+    """Show the most used focal length and a bar chart of photos per focal length."""
     counts = pd.Series(focal).value_counts()
     col1, col2 = st.columns(2)
     col1.metric("Most used focal length", f"{counts.index[0]:g} mm")
     col2.metric("Share of photos", f"{counts.iloc[0] / counts.sum() * 100:.1f}%")
     st.bar_chart(counts.sort_index())
 
+
+def show_groups(focal: np.ndarray, eps: float, min_samples: int) -> None:
+    """Show the DBSCAN groups as a table, a bar chart and one expander per group."""
     st.subheader("DBSCAN groups")
     summary, labels = group_focal(focal, eps, min_samples)
     st.dataframe(summary)
@@ -69,3 +57,33 @@ if directory:
         name = f"Group {g}" if g >= 0 else "Noise"
         with st.expander(f"{name}: {len(members)} photos"):
             st.dataframe(pd.Series(members).value_counts().sort_index().to_frame("Photos"))
+
+
+def main() -> None:
+    """Read the inputs, load the photos and show every section."""
+    default_dir = sys.argv[1] if len(sys.argv) > 1 else ""
+    st.title("Focal Length Analysis")
+
+    path_col, depth_col = st.columns([3, 1])
+    directory = path_col.text_input("Image directory", value=default_dir)
+    depth = int(depth_col.number_input("Subfolder depth", min_value=0, max_value=20, value=0, step=1))
+
+    eps_col, min_col = st.columns(2)
+    eps = eps_col.number_input("DBSCAN eps (mm)", min_value=0.1, value=3.0, step=0.5)
+    min_samples = int(min_col.number_input("DBSCAN min_samples", min_value=1, value=20, step=1))
+
+    if not directory:
+        return
+    try:
+        records = load_records(directory, depth)
+    except ValueError as err:
+        st.error(str(err))
+        return
+
+    focal = records["focal_mm"].to_numpy()
+    show_stats(focal)
+    show_groups(focal, eps, min_samples)
+    render_browser(records, group_bursts(records))
+
+
+main()
